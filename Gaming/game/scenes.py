@@ -15,8 +15,8 @@ from game.config import (
 )
 from game.core import Scene
 from game.grid import Grid
-from game.ui import HUD
-from game.entities import Human, Robot, FastRobot, WhiteBlueRobot, WallHuman, Generator, Bomb, EnergyDrop, Mower, FrozenShooter, Charger, Tank, LaserGun, Virus, BubbleShooter, ShieldDefender
+from game.ui import HUD, hud
+from game.entities import Human, Robot, FastRobot, WhiteBlueRobot, WallHuman, Generator, Bomb, EnergyDrop, Mower, FrozenShooter, Charger, Tank, LaserGun, Virus, BubbleShooter, ShieldDefender, NightStalker, ShadowHealer, IceShroom, GatlingPea, DoomShroom, Crater, ExplosionEffect, SunShroom, PuffShroom, ScaredyShroom, Leaf, TangleKelp, SeaShroom, Cattail, Spikerock
 from game.config import START_ENERGY, SKY_DROP_INTERVAL, UNIT_DEFS, MOWER_SPEED, LEVELS_PER_THEME
 from game.assets import (
     draw_shooter,
@@ -30,9 +30,25 @@ from game.assets import (
     draw_virus,
     draw_bubble_shooter,
     draw_shield_defender,
+    draw_night_stalker,
+    draw_shadow_healer,
+    draw_ice_shroom,
+    draw_gatling_pea,
+    draw_doom_shroom,
+    draw_sun_shroom,
+    draw_puff_shroom,
+    draw_scaredy_shroom,
+    draw_leaf,
+    draw_tangle_kelp,
+    draw_sea_shroom,
+    draw_cattail,
+    draw_spikerock,
     draw_shovel,
 )
 from game.levels import LevelManager
+
+# Custom event for screen shake
+SCREEN_SHAKE_EVENT = pygame.USEREVENT + 1
 
 
 class MenuScene(Scene):
@@ -302,9 +318,24 @@ class UnitSelectScene(Scene):
         self.font = pygame.font.SysFont(None, 26)
         # Get unlocked units for this level to display
         unlocked_keys = self._get_unlocked_units()
-        self.all_units = [u for u in UNIT_DEFS if u["key"] in unlocked_keys]
-        if self.theme == "Day" and self.level >= 10:
-            self.all_units.append({"key": "shovel", "name": "Shovel", "cost": 0, "cooldown": 0})
+        if self.theme == "Night" and self.level in (1, 2, 3):
+            # Special ordering for Night level 1 as requested
+            day_units = [u for u in UNIT_DEFS if u["key"] in unlocked_keys and u["key"] not in ("bubble_shooter", "shield_defender", "night_stalker")]
+            bubble_shooter = next((u for u in UNIT_DEFS if u["key"] == "bubble_shooter"), None)
+            shield_defender = next((u for u in UNIT_DEFS if u["key"] == "shield_defender"), None)
+            night_stalker = next((u for u in UNIT_DEFS if u["key"] == "night_stalker"), None)
+            
+            self.all_units = day_units + [{"key": "shovel", "name": "Shovel", "cost": 0, "cooldown": 0}]
+            if bubble_shooter:
+                self.all_units.append(bubble_shooter)
+            if self.level >= 2 and shield_defender:
+                self.all_units.append(shield_defender)
+            if self.level >= 3 and night_stalker:
+                self.all_units.append(night_stalker)
+        else:
+            self.all_units = [u for u in UNIT_DEFS if u["key"] in unlocked_keys]
+            if (self.theme == "Day" and self.level >= 10):
+                self.all_units.append({"key": "shovel", "name": "Shovel", "cost": 0, "cooldown": 0})
         self.max_select = 8
         self.selected: set[str] = set()
         # icon cache
@@ -330,15 +361,61 @@ class UnitSelectScene(Scene):
             if self.level == 8: return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun"]
             if self.level == 9: return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus"]
             if self.level >= 10: return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus"]
-        # Night theme
+        # Night theme (starts after Day level 10)
         elif self.theme == "Night":
-            if self.level == 1: return ["bubble_shooter"]
-            if self.level == 2: return ["bubble_shooter", "shield_defender", "shooter"]
-            if self.level == 3: return ["bubble_shooter", "shield_defender", "shooter", "wall"]
-            if self.level == 4: return ["bubble_shooter", "shield_defender", "shooter", "wall", "frozen"]
-            if self.level == 5: return ["bubble_shooter", "shield_defender", "shooter", "wall", "frozen", "bomb"]
-            if self.level == 6: return ["bubble_shooter", "shield_defender", "shooter", "wall", "frozen", "bomb", "charger"]
-            if self.level >= 7: return ["bubble_shooter", "shield_defender", "shooter", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus"]
+            if self.level == 1:
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter"]
+            if self.level == 2:
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender"]
+            if self.level == 3:
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker"]
+            if self.level == 4:
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer"]
+            if self.level == 5:
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom"]
+            if self.level == 6:
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea"]
+            if self.level == 7:
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea", "doom_shroom"]
+            if self.level == 8:
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea", "doom_shroom", "sun_shroom"]
+            if self.level == 9:
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea", "doom_shroom", "sun_shroom", "puff_shroom"]
+            if self.level >= 10:
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea", "doom_shroom", "sun_shroom", "puff_shroom", "scaredy_shroom"]
+        elif self.theme == "Pool":
+            if self.level == 1:
+                return [
+                    "shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus",
+                    "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom",
+                    "gatling_pea", "doom_shroom", "sun_shroom", "puff_shroom", "scaredy_shroom", "leaf", "tangle_kelp"
+                ]
+            if self.level == 2:
+                return [
+                    "shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus",
+                    "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom",
+                    "gatling_pea", "doom_shroom", "sun_shroom", "puff_shroom", "scaredy_shroom", "leaf", "tangle_kelp"
+                ]
+            if self.level == 3:
+                return [
+                    "shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "shovel",
+                    "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom",
+                    "gatling_pea", "doom_shroom", "sun_shroom", "puff_shroom", "scaredy_shroom", "leaf", "tangle_kelp", "sea_shroom"
+                ]
+            if self.level == 4:
+                return [
+                    "shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "shovel",
+                    "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom",
+                    "gatling_pea", "doom_shroom", "sun_shroom", "puff_shroom", "scaredy_shroom", "leaf", "tangle_kelp", "sea_shroom", "cattail"
+                ]
+            if self.level >= 5:
+                return [
+                    "shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "shovel", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea", "doom_shroom", "sun_shroom", "puff_shroom", "scaredy_shroom", "leaf", "tangle_kelp", "sea_shroom", "cattail", "spikerock"
+                ]
+            return ["shooter", "leaf", "tangle_kelp", "sea_shroom"] # Fallback for other pool levels
+        # Fallback for other themes like Fog, Roof
+        elif self.theme in ("Fog", "Roof"):
+            return ["shooter", "generator", "wall", "frozen", "bomb"]
         
         return ["shooter"]
 
@@ -382,6 +459,34 @@ class UnitSelectScene(Scene):
             base = draw_bubble_shooter()
         elif key == "shield_defender":
             base = draw_shield_defender()
+        elif key == "night_stalker":
+            base = draw_night_stalker()
+        elif key == "shadow_healer":
+            base = draw_shadow_healer()
+        elif key == "ice_shroom":
+            base = draw_ice_shroom()
+        elif key == "gatling_pea":
+            base = draw_gatling_pea()
+        elif key == "doom_shroom":
+            base = draw_doom_shroom()
+        elif key == "sun_shroom":
+            base = draw_sun_shroom()
+        elif key == "puff_shroom":
+            base = draw_puff_shroom()
+        elif key == "scaredy_shroom":
+            base = draw_scaredy_shroom()
+        elif key == "leaf":
+            base = draw_leaf()
+        elif key == "tangle_kelp":
+            base = draw_tangle_kelp()
+        elif key == "sea_shroom":
+            base = draw_sea_shroom()
+        elif key == "cattail":
+            base = draw_cattail()
+        elif key == "spikerock":
+            base = draw_spikerock()
+        elif key == "sea_mine":
+            base = draw_sea_mine()
         elif key == "shovel":
             base = draw_shovel()
         else:
@@ -411,7 +516,6 @@ class UnitSelectScene(Scene):
                     else:
                         if len(self.selected) < self.max_select:
                             self.selected.add(key)
-                    return
 
     def _start_if_any(self) -> None:
         if len(self.selected) == 0:
@@ -518,16 +622,10 @@ class LevelCompleteScene(Scene):
         title_y = 80 + int(15 * (self.animation_timer % 0.5))
         screen.blit(title, (title_x, title_y))
         
-        # Power-up message with glow effect
-        power_text = self.font.render(f"🎁 NEW POWER UNLOCKED: {self.power_up.upper()} 🎁", True, (255, 255, 100))
-        power_x = WINDOW_WIDTH // 2 - power_text.get_width() // 2
-        power_y = 160 + int(8 * (self.animation_timer % 0.3))
-        screen.blit(power_text, (power_x, power_y))
-        
         # Next level message
         next_level_text = self.font.render(f"🚀 Moving to Level {self.level + 1}...", True, (100, 255, 100))
         next_x = WINDOW_WIDTH // 2 - next_level_text.get_width() // 2
-        next_y = 200 + int(5 * (self.animation_timer % 0.4))
+        next_y = 160 + int(5 * (self.animation_timer % 0.4))
         screen.blit(next_level_text, (next_x, next_y))
         
         # Animated border effect
@@ -535,7 +633,7 @@ class LevelCompleteScene(Scene):
         border_color = (255, 255, 100, 150)
         border_alpha = int(100 + 50 * (self.animation_timer % 1.0))
         
-        # Draw animated border
+        # Draw animate4d border
         pygame.draw.rect(screen, (255, 255, 100), (0, 0, WINDOW_WIDTH, border_width))
         pygame.draw.rect(screen, (255, 255, 100), (0, WINDOW_HEIGHT - border_width, WINDOW_WIDTH, border_width))
         pygame.draw.rect(screen, (255, 255, 100), (0, 0, border_width, WINDOW_HEIGHT))
@@ -544,7 +642,7 @@ class LevelCompleteScene(Scene):
         # Continue message
         continue_text = self.font_small.render("Press any key to continue...", True, (200, 200, 200))
         continue_x = WINDOW_WIDTH // 2 - continue_text.get_width() // 2
-        continue_y = 250 + int(3 * (self.animation_timer % 0.2))
+        continue_y = 210 + int(3 * (self.animation_timer % 0.2))
         screen.blit(continue_text, (continue_x, continue_y))
 
 
@@ -554,6 +652,12 @@ class PlayScene(Scene):
         self.theme = theme
         self.level = level or 1
         self.next_scene = None
+        self.grid_adjustment_mode = False # Grid is set, no need for adjustment mode
+
+        
+        # Screen shake attributes
+        self.shake_magnitude = 0
+        self.shake_timer = 0.0
 
         
         # Get level configuration
@@ -587,19 +691,24 @@ class PlayScene(Scene):
             unit_defs = [u for u in UNIT_DEFS if u["key"] in unlocked_units][:8]
 
         
-        # Determine if shovel is enabled based on unit_keys or level progression
-        enable_shovel = "shovel" in unit_keys if unit_keys is not None else (self.level >= 10)
+        # Vertical HUD for Day theme, horizontal for others
+        is_vertical_hud = self.theme == "Day"
         # For left-oriented HUD we need the screen height for vertical scroll calculations.
-        hud_primary_size = WINDOW_HEIGHT if theme == "Day" else WINDOW_WIDTH
-        self.hud = HUD(hud_primary_size, orientation="left" if theme == "Day" else "top", unit_defs=unit_defs, enable_shovel=enable_shovel)
+        hud_primary_size = WINDOW_HEIGHT if is_vertical_hud else WINDOW_WIDTH
+        enable_shovel = "shovel" in (unit_keys or [])
+        self.hud = HUD(hud_primary_size, orientation="left" if is_vertical_hud else "top", unit_defs=unit_defs, enable_shovel=enable_shovel)
         
         # Adjust grid origin to align with background lawn art
         if theme in ("Day", "Night"):
             # Use the same placement for Day and Night so mowers align by the house
             self.grid_origin = [360, 140]
+        elif self.theme == "Pool":
+            # Shifted right 2.5 tiles and down 0.5 tiles to better fit the background art
+            self.grid_origin = [int(64 + (2.5 * TILE_SIZE)), 136]
         else:
             self.grid_origin = [64, 96]
         self.grid = Grid(*self.grid_origin)
+        self.tile_size = TILE_SIZE # Add tile_size attribute for dynamic adjustment
         self.humans = pygame.sprite.Group()
         self.robots = pygame.sprite.Group()
         self.projectiles = pygame.sprite.Group()
@@ -607,6 +716,8 @@ class PlayScene(Scene):
         self.bombs = pygame.sprite.Group()
         self.energy_drops = pygame.sprite.Group()
         self.mowers = pygame.sprite.Group()
+        self.craters = pygame.sprite.Group()
+        self.effects = pygame.sprite.Group() # For visual effects like explosions
         self.font = pygame.font.SysFont(None, 24)
         # Set initial spawn timer to 50 seconds for first robot
         # Add some randomness to prevent predictable timing
@@ -658,13 +769,25 @@ class PlayScene(Scene):
             except Exception as e:
                 print(f"⚠️ Error loading Night background: {e}")
                 self.bg_image = None
+        elif self.theme == "Pool":
+            try:
+                base = os.path.dirname(__file__)
+                # Try to load the Pool background image
+                pool_names = ("pool_bg.jpeg", "pool_bg.jpg", "pool_bg.png", "pool.jpeg", "pool.jpg", "pool.png", "bg_pool.jpeg", "bg_pool.jpg", "bg_pool.png")
+                for name in pool_names:
+                    p = os.path.join(base, "images", name)
+                    if os.path.exists(p):
+                        img = pygame.image.load(p).convert()
+                        self.bg_image = pygame.transform.smoothscale(img, (WINDOW_WIDTH, WINDOW_HEIGHT))
+                        print(f"🌊 Loaded Pool background: {p}")
+                        break
+            except Exception as e:
+                print(f"⚠️ Error loading Pool background: {e}")
+                self.bg_image = None
 
         if self.theme == "Fog":
             self.fog_surface = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
             self.fog_surface.fill((200, 200, 200, 90))
-        if self.theme == "Water":
-            # middle lane is water (0-indexed lane 2)
-            self.water_rows = {2}
         # Place lawn mowers on each lane
         for lane in range(NUM_LANES):
             y = self.grid_origin[1] + lane * TILE_SIZE + TILE_SIZE // 2
@@ -701,20 +824,30 @@ class PlayScene(Scene):
         
         # Night theme (starts after Day level 10)
         elif self.theme == "Night":
-            if self.level == 1:
-                return ["bubble_shooter"]  # Free bubble shooter for Night theme
-            if self.level == 2:
-                return ["bubble_shooter", "shield_defender", "shooter"]  # Shield Defender unlocked at Night level 2
-            if self.level == 3:
-                return ["bubble_shooter", "shield_defender", "shooter", "wall"]
-            if self.level == 4:
-                return ["bubble_shooter", "shield_defender", "shooter", "wall", "frozen"]
-            if self.level == 5:
-                return ["bubble_shooter", "shield_defender", "shooter", "wall", "frozen", "bomb"]
-            if self.level == 6:
-                return ["bubble_shooter", "shield_defender", "shooter", "wall", "frozen", "bomb", "charger"]
-            if self.level >= 7:
-                return ["bubble_shooter", "shield_defender", "shooter", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus"]
+            if self.level == 1: # Custom units for Night level 1
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter"]
+            if self.level == 2: # Custom units for Night level 2
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender"]
+            if self.level == 3: # Custom units for Night level 3
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker"]
+            if self.level == 4: # Custom units for Night level 4
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer"]
+            if self.level == 5: # Custom units for Night level 5
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom"]
+            if self.level == 6: # Custom units for Night level 6
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea"]
+            if self.level == 7: # Custom units for Night level 7
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea", "doom_shroom"]
+            if self.level == 8: # Custom units for Night level 8
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea", "doom_shroom", "sun_shroom"]
+            if self.level == 9: # Custom units for Night level 9
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea", "doom_shroom", "sun_shroom", "puff_shroom"]
+            if self.level >= 10: # Custom units for Night level 10+
+                return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea", "doom_shroom", "sun_shroom", "puff_shroom", "scaredy_shroom"]
+        
+        # Pool theme unlocks
+        elif self.theme == "Pool":
+            return ["shooter", "generator", "wall", "frozen", "bomb", "charger", "tank", "laser_gun", "virus", "shovel", "bubble_shooter", "shield_defender", "night_stalker", "shadow_healer", "ice_shroom", "gatling_pea", "doom_shroom", "sun_shroom", "puff_shroom", "scaredy_shroom", "leaf", "tangle_kelp", "sea_shroom", "cattail", "spikerock", "sea_mine"]
         
         return ["shooter"]
 
@@ -738,75 +871,140 @@ class PlayScene(Scene):
             manager.set_current(self.theme, self.level + 1)
 
     def handle_event(self, event: pygame.event.Event) -> None:
+        # Pass all events to the HUD first
         self.hud.handle_event(event)
+        
+        # Handle placing units with left-click
         if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            tile = self.grid.get_tile_at_pos(event.pos)
-            if tile is not None:
-                # water restriction
-                if tile.row in self.water_rows:
+            # If the click was on the HUD, the HUD handles it, so we don't place a unit.
+            if not self.hud.is_pos_on_hud(event.pos):
+                # This was calling a non-existent method. Let's integrate the logic here.
+                pos = event.pos
+                tile = self.grid.get_tile_at_pos(pos)
+                if tile is None:
                     return
+
+                # Check if tile is occupied by any existing unit
+                is_occupied = any(ent.rect.colliderect(tile.rect) for ent in self.humans) or \
+                              any(ent.rect.colliderect(tile.rect) for ent in self.generators) or \
+                              any(ent.rect.colliderect(tile.rect) for ent in self.bombs)
+
+                # Check if tile is blocked by a crater
+                is_cratered = any(crater.rect.colliderect(tile.rect) for crater in self.craters)
+
+                # Handle Shovel mode first and exit
                 if self.hud.shovel_mode and self.hud.enable_shovel:
-                    # remove any occupant on this tile
                     for group in (self.humans, self.generators, self.bombs):
                         for ent in list(group):
                             if ent.rect.colliderect(tile.rect):
                                 ent.kill()
                                 return
-                center = (tile.rect.centerx, tile.rect.centery)
-                lane_row = tile.row
-                # Prevent double-placement on same tile by simple overlap check
-                occupied = False
-                for group in (self.humans, self.generators, self.bombs):
-                    for ent in group:
-                        if ent.rect.colliderect(tile.rect):
-                            occupied = True
-                            break
-                    if occupied:
-                        break
-                if not occupied:
-                    idx = self.hud.selected_index
-                    unit = getattr(self.hud, "unit_defs", UNIT_DEFS)[idx]
-                    # cost & cooldown check
-                    if self.energy < unit["cost"] or self.hud.cooldowns[idx] > 0:
-                        return
-                    self.energy -= unit["cost"]
-                    self.hud.cooldowns[idx] = unit["cooldown"]
-                    key = unit["key"]
-                    if key == "shooter":
-                        self.humans.add(Human(center, lane_row=lane_row))
-                    elif key == "wall":
-                        self.humans.add(WallHuman(center))
-                    elif key in ("generator", "energy_generator", "Energy_generator", "Energy generator"):
-                        self.generators.add(Generator(center))
-                    elif key == "bomb":
-                        self.bombs.add(Bomb(center, lane_row=lane_row))
-                    elif key == "frozen":
-                        self.humans.add(FrozenShooter(center, lane_row=lane_row))
-                    elif key == "charger":
-                        self.humans.add(Charger(center))
-                    elif key == "tank":
-                        self.humans.add(Tank(center, lane_row=lane_row))
-                    elif key == "laser_gun":
-                        self.humans.add(LaserGun(center, lane_row=lane_row))
-                    elif key == "virus":
-                        self.humans.add(Virus(center))
-                    elif key == "bubble_shooter":
-                        self.humans.add(BubbleShooter(center, lane_row=lane_row))
-                    elif key == "shield_defender":
-                        self.humans.add(ShieldDefender(center))
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3:
-            # right-click collects energy drops if clicked on
+                    return # Exit after attempting to shovel, even if nothing was there
+
+                # Special placement logic for Cattail (upgrade for Lily Pad)
+                idx = self.hud.selected_index
+                unit = getattr(self.hud, "unit_defs", UNIT_DEFS)[idx]
+                key = unit["key"]
+                if key == "cattail":
+                    # Must be placed on a Lily Pad (Leaf)
+                    lily_pad_found = any(isinstance(ent, Leaf) and ent.rect.colliderect(tile.rect) for ent in self.humans)
+                    if not lily_pad_found:
+                        return # Can't place Cattail here
+                elif key == "spikerock":
+                    # Must be placed on a WallHuman
+                    wall_found = any(isinstance(ent, WallHuman) and not isinstance(ent, Spikerock) and ent.rect.colliderect(tile.rect) for ent in self.humans)
+                    if not wall_found:
+                        return # Can't place Spikerock here
+
+                if is_occupied or is_cratered:
+                    return
+
+                idx = self.hud.selected_index
+                unit = getattr(self.hud, "unit_defs", UNIT_DEFS)[idx]
+                key = unit["key"]
+
+                # Water restriction
+                if tile.row in self.water_rows and key not in ("leaf", "tangle_kelp", "sea_shroom", "cattail", "sea_mine"):
+                    return
+
+                # Get selected unit and check cost/cooldown
+                if self.energy < unit["cost"] or self.hud.cooldowns[idx] > 0:
+                    return
+
+                # All checks passed, place the unit
+                self.energy -= unit["cost"]
+                self.hud.cooldowns[idx] = unit["cooldown"]
+                self._place_unit_at_tile(tile, key)
+                return # Placement handled
+        
+        # Handle collecting energy with right-click
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 3: # right-click collects energy drops if clicked on
             for drop in list(self.energy_drops):
-                if drop.rect.collidepoint(event.pos):
-                    self.energy += 25
+                if hasattr(drop, 'collect_rect') and drop.collect_rect.collidepoint(event.pos):
+                    self.energy += drop.value
                     drop.kill()
+        
+        # Handle screen shake event
+        elif event.type == SCREEN_SHAKE_EVENT:
+            self.shake_magnitude = getattr(event, 'magnitude', 10)
+            self.shake_timer = getattr(event, 'duration', 0.4)
+
+    def _place_unit_at_tile(self, tile, key: str) -> None:
+        center = tile.rect.center
+        # Adjust center based on dynamic tile size
+        center = (self.grid_origin[0] + tile.col * self.tile_size + self.tile_size // 2,
+                  self.grid_origin[1] + tile.row * self.tile_size + self.tile_size // 2)
+
+        lane_row = tile.row
+
+        # Create and add the unit to the appropriate group
+        if key == "shooter": self.humans.add(Human(center, lane_row=lane_row))
+        elif key == "wall": self.humans.add(WallHuman(center))
+        elif key in ("generator", "energy_generator", "Energy_generator", "Energy generator"): self.generators.add(Generator(center))
+        elif key == "bomb": self.bombs.add(Bomb(center, lane_row=lane_row))
+        elif key == "frozen": self.humans.add(FrozenShooter(center, lane_row=lane_row))
+        elif key == "charger": self.humans.add(Charger(center))
+        elif key == "tank": self.humans.add(Tank(center, lane_row=lane_row))
+        elif key == "laser_gun": self.humans.add(LaserGun(center, lane_row=lane_row))
+        elif key == "virus": self.humans.add(Virus(center))
+        elif key == "bubble_shooter": self.humans.add(BubbleShooter(center, lane_row=lane_row))
+        elif key == "shield_defender": self.humans.add(ShieldDefender(center))
+        elif key == "night_stalker": self.humans.add(NightStalker(center, lane_row=lane_row))
+        elif key == "shadow_healer": self.humans.add(ShadowHealer(center))
+        elif key == "ice_shroom": self.humans.add(IceShroom(center))
+        elif key == "gatling_pea": self.humans.add(GatlingPea(center, lane_row=lane_row))
+        elif key == "doom_shroom": self.humans.add(DoomShroom(center, self.craters, self.effects))
+        elif key == "sun_shroom": self.generators.add(SunShroom(center))
+        elif key == "puff_shroom": self.humans.add(PuffShroom(center, lane_row=lane_row))
+        elif key == "scaredy_shroom": self.humans.add(ScaredyShroom(center, lane_row=lane_row))
+        elif key == "leaf": self.humans.add(Leaf(center))
+        elif key == "tangle_kelp": self.humans.add(TangleKelp(center))
+        elif key == "sea_shroom": self.humans.add(SeaShroom(center, lane_row=lane_row))
+        elif key == "cattail": self.humans.add(Cattail(center))
+        elif key == "spikerock": self.humans.add(Spikerock(center))
+        elif key == "sea_mine": self.humans.add(SeaMine(center))
 
     def update(self, dt: float) -> None:
         self.elapsed += dt
+        if self.grid_adjustment_mode:
+            # In adjustment mode, we don't update game logic.
+            return
+
         self.hud.tick_cooldowns(dt)
+        
+        # Update screen shake timer
+        if self.shake_timer > 0:
+            self.shake_timer = max(0.0, self.shake_timer - dt)
+            if self.shake_timer == 0.0:
+                self.shake_magnitude = 0
+        
+        all_units = pygame.sprite.Group(self.humans, self.generators, self.bombs)
         
         # Update kill effects
         self._update_kill_effects(dt)
+        
+        # Update general visual effects
+        self.effects.update(dt)
         
 
         
@@ -819,7 +1017,8 @@ class PlayScene(Scene):
                 if self.robots_spawned >= final_wave_threshold and not hasattr(self, '_final_wave_triggered'):
                     # Trigger final wave - spawn many robots quickly
                     self._final_wave_triggered = True
-                    self._final_wave_robots = 20  # Final wave spawns exactly 20 robots
+                    # Calculate remaining robots to spawn for the final wave
+                    self._final_wave_robots = self.robots_to_spawn - self.robots_spawned
                     self._final_wave_spawned = 0
                     self._final_wave_timer = 0.0
                     self._final_wave_message_timer = 0.0  # Timer for showing the message
@@ -846,8 +1045,6 @@ class PlayScene(Scene):
                                     self.robots.add(WhiteBlueRobot((spawn_x, spawn_y), lane_row=lane))
                                 else:
                                     self.robots.add(Robot((spawn_x, spawn_y), lane_row=lane))
-                                
-                                self._final_wave_spawned += 1
                                 self.robots_spawned += 1
                                 self.lane_robot_counts[lane] += 1
                                 print(f"🚨 Final wave robot {self._final_wave_spawned}/{self._final_wave_robots} spawned in lane {lane}")
@@ -905,13 +1102,14 @@ class PlayScene(Scene):
                             else:
                                 # After 7 robots, more variety
                                 robot_type = random.choice(["robot", "fast", "white_blue"])
-                            
+
                             if robot_type == "fast":
                                 self.robots.add(FastRobot((spawn_x, spawn_y), lane_row=lane))
                             elif robot_type == "white_blue":
                                 self.robots.add(WhiteBlueRobot((spawn_x, spawn_y), lane_row=lane))
                             else:
                                 self.robots.add(Robot((spawn_x, spawn_y), lane_row=lane))
+
                             self.robots_spawned += 1
                             self.lane_robot_counts[lane] += 1
                             
@@ -930,7 +1128,9 @@ class PlayScene(Scene):
             self.sky_timer = random.uniform(*self.sky_interval)
             x = random.randint(self.grid_origin[0], self.grid_origin[0] + TILES_PER_LANE * TILE_SIZE)
             y = 64
-            self.energy_drops.add(EnergyDrop((x, y)))
+            # Sky drops use the default energy value
+            from game.config import ENERGY_DROP_VALUE
+            self.energy_drops.add(EnergyDrop((x, y), value=ENERGY_DROP_VALUE))
 
         for g in list(self.generators):
             g.update(dt, self.energy_drops)
@@ -942,12 +1142,18 @@ class PlayScene(Scene):
         for ent in list(self.humans):
             if isinstance(ent, Charger):
                 ent.update(dt, self.robots)
-            elif isinstance(ent, Virus):
+            elif isinstance(ent, (Virus, TangleKelp)):
                 ent.update(dt, self.robots)
+            elif isinstance(ent, NightStalker):
+                ent.update(dt, self.robots) # The signature is now (dt, robots)
+            elif isinstance(ent, ShadowHealer):
+                ent.update(dt, all_units, self.robots)
+            elif isinstance(ent, (IceShroom, DoomShroom)):
+                ent.update(dt, self.projectiles, self.robots)
 
         for h in list(self.humans):
-            if isinstance(h, (Charger, Virus)):
-                # already updated above
+            if isinstance(h, (Charger, Virus, NightStalker, ShadowHealer, IceShroom, DoomShroom)):
+                # already updated above, skip
                 continue
             elif isinstance(h, WallHuman):
                 # Walls need robots group to block them
@@ -1037,6 +1243,14 @@ class PlayScene(Scene):
         for m in list(self.mowers):
             m.update(dt, self.robots)
 
+        # Update craters so they time out and disappear
+        for c in list(self.craters):
+            c.update(dt)
+
+        # Update and remove finished effects
+        for effect in list(self.effects):
+            effect.update(dt)
+
         # Win condition: all robots spawned and killed
         if (self.robots_spawned >= self.robots_to_spawn and 
             self.robots_killed >= self.robots_to_spawn and 
@@ -1056,22 +1270,29 @@ class PlayScene(Scene):
                 print(f"🚀 Moving to Level {self.level + 1}...")
             
             # Wait 2 seconds then transition
-            self.completion_message_timer += dt
-            if self.completion_message_timer >= 2.0:
-                self._complete_level()
-                
-                # Special power-up message for Night levels
-                if self.theme == "Night" and self.level == 1:
-                    power_up = "Shield Defender"
-                else:
-                    power_up = self.level_config["power_up"]
-                self.next_scene = LevelCompleteScene(self.theme, self.level, power_up)
+            # self.completion_message_timer += dt
+            # if self.completion_message_timer >= 2.0:
+            self._complete_level()
+            
+            # Special power-up message for Night levels
+            if self.theme == "Night" and self.level == 1:
+                power_up = "Shield Defender"
+            else:
+                power_up = self.level_config["power_up"]
+            self.next_scene = LevelCompleteScene(self.theme, self.level, power_up)
 
     def draw(self, screen: pygame.Surface) -> None:
+        # Calculate screen shake offset
+        offset_x, offset_y = 0, 0
+        if self.shake_timer > 0 and not self.grid_adjustment_mode:
+            offset_x = random.randint(-self.shake_magnitude, self.shake_magnitude)
+            offset_y = random.randint(-self.shake_magnitude, self.shake_magnitude)
+        
+        render_surface = screen.copy()
         # Background: draw themed art if available; otherwise fallback colors
         if self.bg_image is not None:
             # Works for both Day and Night (and any future themes with art)
-            screen.blit(self.bg_image, (0, 0))
+            render_surface.blit(self.bg_image, (0, 0))
         else:
             if self.theme == "Day":
                 screen.fill((110, 160, 110))
@@ -1086,59 +1307,59 @@ class PlayScene(Scene):
                         )
                         pygame.draw.rect(screen, (0, 0, 0), rect, 1)
             else:
-                screen.fill(COLOR_BG.get(self.theme, (40, 40, 40)))
-        self.hud.draw(screen, self.energy)
-        self.grid.draw(screen)
-        # Visualize water rows
-        if self.water_rows:
-            for r in self.water_rows:
-                y = self.grid_origin[1] + r * TILE_SIZE
-                pygame.draw.rect(screen, (40, 90, 150), (self.grid_origin[0], y, TILE_SIZE * TILES_PER_LANE, TILE_SIZE))
+                render_surface.fill(COLOR_BG.get(self.theme, (40, 40, 40)))
+        
+        self.grid.draw(render_surface)
         # custom render for spawn/idle effects
         for g in self.generators:
-            g.render(screen)
+            g.render(render_surface)
         for h in self.humans:
-            h.render(screen)
+            h.render(render_surface)
         for b in self.bombs:
-            b.render(screen)
+            b.render(render_surface)
         for r in self.robots:
-            r.render(screen)
+            r.render(render_surface)
         for p in self.projectiles:
-            p.render(screen)
+            p.render(render_surface)
         for m in self.mowers:
-            m.render(screen)
-        self.energy_drops.draw(screen)
+            m.render(render_surface)
+        for c in self.craters:
+            c.render(render_surface)
+        self.energy_drops.draw(render_surface)
         
+        # Draw visual effects on top of most other things
+        self.effects.draw(render_surface)
         # Draw kill effects
-        self._draw_kill_effects(screen)
+        self._draw_kill_effects(render_surface)
         
         if self.fog_surface is not None:
-            screen.blit(self.fog_surface, (0, 0))
+            render_surface.blit(self.fog_surface, (0, 0))
+        
+        # Blit the entire game surface with the shake offset
+        screen.fill(COLOR_BG.get(self.theme, (40, 40, 40))) # Clear screen with bg color
+        screen.blit(render_surface, (offset_x, offset_y))
+        
+        # Draw HUD and other static UI elements last, so they don't shake
+        self.hud.draw(screen, self.energy)
         # Level info
         level_text = self.font.render(f"Level {self.level} | Robots: {self.robots_killed}/{self.robots_to_spawn} | Energy: {self.energy} | Lives: {self.lives}", True, (20, 20, 20))
         screen.blit(level_text, (8, WINDOW_HEIGHT - 28))
-        
-        # Level progress bar
+
+        # Draw level progress bar
         self._draw_level_progress(screen)
         
         # Draw completion message if level is complete
         if self.show_completion_message:
             self._draw_completion_message(screen)
-        
         # Draw final wave message if triggered
         if hasattr(self, '_final_wave_triggered') and self._final_wave_triggered:
             self._draw_final_wave_message(screen)
         
-
-
-
-
-
-
     def _draw_level_progress(self, screen: pygame.Surface) -> None:
         """Draw animated level progress bar at the top of the screen"""
         bar_width = 400
         bar_height = 25
+        
         bar_x = (WINDOW_WIDTH - bar_width) // 2
         bar_y = 10
         
@@ -1250,6 +1471,148 @@ class PlayScene(Scene):
                 'size': random.randint(2, 6)
             }
             self.kill_effects.append(particle)
+
+    def _update_kill_effects(self, dt: float) -> None:
+        """Update kill effect particles"""
+        for particle in self.kill_effects[:]:
+            particle['life'] -= dt * 2.0
+            particle['pos'][0] += particle['vel'][0] * dt
+            particle['pos'][1] += particle['vel'][1] * dt
+            particle['vel'][1] += 200 * dt  # Gravity
+            
+            if particle['life'] <= 0:
+                self.kill_effects.remove(particle)
+
+    def _draw_kill_effects(self, screen: pygame.Surface) -> None:
+        """Draw kill effect particles"""
+        for particle in self.kill_effects:
+            alpha = int(255 * particle['life'])
+            color = (*particle['color'], alpha)
+            size = int(particle['size'] * particle['life'])
+            if size > 0:
+                pygame.draw.circle(screen, particle['color'], 
+                                 (int(particle['pos'][0]), int(particle['pos'][1])), size)
+        bar_width = 400
+        bar_height = 25
+        
+        bar_x = (WINDOW_WIDTH - bar_width) // 2
+        bar_y = 10
+        
+        # Background with gradient effect
+        for i in range(bar_height):
+            alpha = 100 + (i * 2)
+            color = (100, 100, 100, alpha)
+            pygame.draw.rect(screen, (100, 100, 100), (bar_x, bar_y + i, bar_width, 1))
+        
+        # Progress with smooth animation
+        progress = self.robots_killed / max(1, self.robots_to_spawn)
+        progress_width = int(bar_width * progress)
+        
+        # Animated progress bar with gradient
+        if progress_width > 0:
+            for i in range(progress_width):
+                # Create gradient effect from green to yellow to red
+                if progress < 0.5:
+                    # Green to yellow
+                    ratio = progress * 2
+                    r = int(max(0, min(255, 0 + (255 * ratio))))
+                    g = 255
+                    b = 0
+                else:
+                    # Yellow to red
+                    ratio = (progress - 0.5) * 2
+                    r = 255
+                    g = int(max(0, min(255, 255 - (255 * ratio))))
+                    b = 0
+                
+                # Add some animation based on time
+                animation_offset = int(5 * (self.elapsed % 0.5))
+                bar_segment_height = bar_height + (animation_offset if i % 10 == 0 else 0)
+                
+                pygame.draw.rect(screen, (r, g, b), (bar_x + i, bar_y, 1, bar_segment_height))
+        
+        # Border with glow effect
+        border_color = (255, 255, 255) if progress >= 1.0 else (200, 200, 200)
+        pygame.draw.rect(screen, border_color, (bar_x, bar_y, bar_width, bar_height), 3)
+        
+        # Inner border
+        pygame.draw.rect(screen, (50, 50, 50), (bar_x + 2, bar_y + 2, bar_width - 4, bar_height - 4), 1)
+        
+        # Progress text with animation
+        progress_text = self.font.render(f"Progress: {self.robots_killed}/{self.robots_to_spawn}", True, (255, 255, 255))
+        text_x = bar_x + bar_width // 2 - progress_text.get_width() // 2
+        text_y = bar_y + bar_height // 2 - progress_text.get_height() // 2
+        
+        # Add slight bounce animation when progress increases
+        if hasattr(self, '_last_progress') and self.robots_killed > getattr(self, '_last_killed', 0):
+            text_y += int(3 * (self.elapsed % 0.3))
+        
+        screen.blit(progress_text, (text_x, text_y))
+        
+        # Store last progress for animation
+        self._last_progress = progress
+        self._last_killed = self.robots_killed
+
+    def _draw_completion_message(self, screen: pygame.Surface) -> None:
+        """Draw completion message overlay when level is complete"""
+        # Semi-transparent overlay
+        overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT))
+        overlay.set_alpha(128)
+        overlay.fill((0, 0, 0))
+        screen.blit(overlay, (0, 0))
+        
+        # Completion message
+        font_big = pygame.font.SysFont(None, 64, bold=True)
+        font_med = pygame.font.SysFont(None, 36)
+        
+        # Main completion text
+        title = font_big.render(f"🎉 LEVEL {self.level} COMPLETED! 🎉", True, (255, 255, 255))
+        title_x = WINDOW_WIDTH // 2 - title.get_width() // 2
+        title_y = WINDOW_HEIGHT // 2 - 80
+        screen.blit(title, (title_x, title_y))
+        
+        # Power-up text
+        power_text = font_med.render(f"🎁 New Power: {self.level_config['power_up'].title()} 🎁", True, (255, 255, 100))
+        power_x = WINDOW_WIDTH // 2 - power_text.get_width() // 2
+        power_y = WINDOW_HEIGHT // 2 - 20
+        screen.blit(power_text, (power_x, power_y))
+        
+        # Next level text
+        next_text = font_med.render(f"🚀 Moving to Level {self.level + 1}...", True, (100, 255, 100))
+        next_x = WINDOW_WIDTH // 2 - next_text.get_width() // 2
+        next_y = WINDOW_HEIGHT // 2 + 40
+        screen.blit(next_text, (next_x, next_y))
+
+
+    def _draw_final_wave_message(self, screen: pygame.Surface) -> None:
+        """Draw the "FINAL WAVE!" message without dimming the screen"""
+        # Final wave text only (no blur/dim overlay)
+        font_big = pygame.font.SysFont(None, 72, bold=True)
+        text = font_big.render("FINAL WAVE!", True, (255, 0, 0))  # Red text for urgency
+        text_x = WINDOW_WIDTH // 2 - text.get_width() // 2
+        text_y = WINDOW_HEIGHT // 2 - 100
+        screen.blit(text, (text_x, text_y))
+
+    def _draw_grid_adjustment_overlay(self, screen: pygame.Surface) -> None:
+        """Draw instructions for adjusting the grid."""
+        overlay = pygame.Surface((WINDOW_WIDTH, WINDOW_HEIGHT), pygame.SRCALPHA)
+        overlay.fill((0, 0, 0, 150))
+        screen.blit(overlay, (0, 0))
+
+        font_big = pygame.font.SysFont(None, 48, bold=True)
+        font_med = pygame.font.SysFont(None, 32)
+
+        title = font_big.render("Grid Adjustment Mode", True, (255, 255, 255))
+        screen.blit(title, (WINDOW_WIDTH // 2 - title.get_width() // 2, 150))
+
+        instructions = [
+            "Use Arrow Keys to move the grid.",
+            "Use '+' and '-' to change tile size.",
+            "Press ENTER to confirm and start the level."
+        ]
+        for i, line in enumerate(instructions):
+            text = font_med.render(line, True, (220, 220, 220))
+            screen.blit(text, (WINDOW_WIDTH // 2 - text.get_width() // 2, 220 + i * 40))
 
     def _update_kill_effects(self, dt: float) -> None:
         """Update kill effect particles"""

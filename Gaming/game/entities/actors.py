@@ -28,6 +28,20 @@ from game.assets import (
     draw_shield_defender,
     draw_night_stalker,
     draw_shadow_healer,
+    draw_ice_shroom,
+    draw_gatling_pea,
+    draw_doom_shroom,
+    draw_crater,
+    draw_sun_shroom,
+    draw_puff_shroom,
+    draw_scaredy_shroom,
+    draw_leaf,
+    draw_tangle_kelp,
+    draw_sea_shroom,
+    draw_cattail,
+    draw_sea_mine,
+    draw_spike_projectile,
+    draw_spikerock,
 )
 from game.config import (
     ROBOT_BASE_SPEED,
@@ -35,6 +49,7 @@ from game.config import (
     PROJECTILE_DAMAGE,
     SHOOTER_COOLDOWN,
     WALL_HP,
+    ENERGY_DROP_VALUE,
     SHOOTER_HP,
     GENERATOR_HP,
     ROBOT_CHEW_DAMAGE_PER_SEC,
@@ -61,6 +76,23 @@ from game.config import (
     SHADOW_HEALER_HEAL_RADIUS,
     SHADOW_HEALER_HEAL_COOLDOWN,
     SHADOW_HEALER_CLOAK_DURATION,
+    DOOM_SHROOM_ARM_TIME,
+    DOOM_SHROOM_RADIUS,
+    CRATER_LIFETIME,
+    SUN_SHROOM_GROW_TIME,
+    SUN_SHROOM_SMALL_ENERGY,
+    SUN_SHROOM_INITIAL_COOLDOWN,
+    SUN_SHROOM_NORMAL_COOLDOWN,
+    PUFF_SHROOM_LIFETIME,
+    PUFF_SHROOM_RANGE,
+    PUFF_SHROOM_HP,
+    SCAREDY_SHROOM_SCARED_RANGE,
+    SCAREDY_SHROOM_HP,
+    BOMB_RADIUS,
+    BOMB_DAMAGE,
+    SPIKEROCK_HP,
+    SPIKEROCK_CONTACT_DAMAGE_PER_SEC,
+    GENERATOR_HP,
 )
 
 
@@ -160,8 +192,20 @@ class Robot(Entity):
             # Don't call kill() here - let the PlayScene handle it
 
     def apply_slow(self, factor: float, duration: float) -> None:
-        self.slow_multiplier = max(0.1, factor)
+        # Allow a factor of 0.0 for a complete freeze
+        self.slow_multiplier = max(0.0, factor)
         self.slow_timer = max(self.slow_timer, duration)
+
+    def render(self, screen: pygame.Surface) -> None:
+        # Default render
+        super().render(screen)
+        # Draw ice effect if completely frozen by Ice Shroom
+        if self.slow_timer > 0 and self.slow_multiplier == 0.0:
+            ice_overlay = pygame.Surface(self.rect.size, pygame.SRCALPHA)
+            # Fade the ice effect in and out slightly
+            alpha = 100 + 50 * (0.5 + 0.5 * pygame.math.Vector2(1, 0).rotate(pygame.time.get_ticks() * 0.5).y)
+            ice_overlay.fill((180, 220, 255, alpha))
+            screen.blit(ice_overlay, self.rect.topleft)
 
 
 class FastRobot(Robot):
@@ -204,6 +248,32 @@ class Projectile(Entity):
             self.kill()
         if self.rect.left > 1400:
             self.kill()
+
+
+class SpikeProjectile(Projectile):
+    """A homing projectile that targets a specific robot."""
+
+    def __init__(self, pos: tuple[int, int], target: Robot) -> None:
+        super().__init__(pos)
+        self.image = draw_spike_projectile()
+        self.target = target
+        self.speed = PROJECTILE_SPEED * 1.5 # Faster than normal projectiles
+
+    def update(self, dt: float, robots: pygame.sprite.Group) -> None:
+        if not self.target.alive():
+            self.kill()
+            return
+
+        # Move towards the target
+        direction = pygame.math.Vector2(self.target.rect.center) - pygame.math.Vector2(self.rect.center)
+        if direction.length() > 0:
+            direction.normalize_ip()
+        
+        self.rect.centerx += direction.x * self.speed * dt
+        self.rect.centery += direction.y * self.speed * dt
+
+        # Use the same collision logic as the base projectile
+        super().update(dt, robots)
 
 
 class IceProjectile(Projectile):
@@ -265,6 +335,16 @@ class WallHuman(Entity):
             self.kill()
             print(f"🏗️ Wall removed after killing {self.robots_killed} robots!")
 
+class Spikerock(WallHuman):
+    """An upgrade to the Wall, with more health and contact damage."""
+
+    def __init__(self, pos: tuple[int, int]) -> None:
+        super().__init__(pos)
+        self.image = draw_spikerock()
+        self.rect = self.image.get_rect(center=pos)
+        self.alive_hp = SPIKEROCK_HP
+        self.contact_damage_per_sec = SPIKEROCK_CONTACT_DAMAGE_PER_SEC
+
 
 class Generator(Entity):
     def __init__(self, pos: tuple[int, int]) -> None:
@@ -284,11 +364,12 @@ class Generator(Entity):
 
 
 class EnergyDrop(Entity):
-    def __init__(self, pos: tuple[int, int]) -> None:
+    def __init__(self, pos: tuple[int, int], value: int = ENERGY_DROP_VALUE) -> None:
         super().__init__()
         self.image = draw_energy()
         self.rect = self.image.get_rect(center=pos)
         self.fall_speed = 40.0
+        self.value = value
         self.collect_rect = self.rect.copy()
 
     def update(self, dt: float) -> None:
@@ -459,6 +540,16 @@ class LaserGun(Human):
                 proj.damage_value = self.laser_damage
                 projectiles.add(proj)
                 self.shoot_timer = self.shoot_cooldown
+
+
+class GatlingPea(LaserGun):
+    """A very fast-firing unit, an upgrade to the LaserGun."""
+
+    def __init__(self, pos: tuple[int, int], lane_row: int | None = None) -> None:
+        super().__init__(pos, lane_row)
+        self.image = draw_gatling_pea()
+        self.shoot_cooldown = 0.25  # Even faster than LaserGun
+        self.laser_damage = 1
 
 
 class Virus(Entity):
@@ -634,7 +725,7 @@ class ShieldDefender(Entity):
 
 
 class NightStalker(Entity):
-    """Stealth assassin unit that can become invisible and deal high damage."""
+    """Unit with a square shield that produces a deadly electric wave."""
     
     def __init__(self, pos: tuple[int, int], lane_row: int | None = None) -> None:
         super().__init__()
@@ -642,140 +733,74 @@ class NightStalker(Entity):
         self.rect = self.image.get_rect(center=pos)
         self.alive_hp = NIGHT_STALKER_HP
         self.lane_row = lane_row
-        self.base_damage = NIGHT_STALKER_DAMAGE  # Renamed to avoid conflict with damage() method
         
-        # Stealth mechanics
-        self.is_stealthed = False
-        self.stealth_timer = 0.0
-        self.stealth_cooldown_timer = 0.0
-        self.stealth_duration = NIGHT_STALKER_STEALTH_DURATION
-        self.stealth_cooldown = NIGHT_STALKER_STEALTH_COOLDOWN
-        
-        # Attack mechanics
-        self.attack_range = TILE_SIZE * 1.2
-        self.attack_cooldown = 1.5
-        self.attack_timer = 0.0
-        
-        # Visual effects
-        self.original_image = self.image.copy()
-        self.stealth_alpha = 100  # Semi-transparent when stealthed
+        # Electric wave mechanics
+        self.wave_cooldown = 5.0  # Time between waves
+        self.wave_timer = self.wave_cooldown
+        self.wave_active = False
+        self.wave_radius = 0.0
+        self.wave_max_radius = TILE_SIZE * 2.5
+        self.wave_speed = 250.0
+        self.wave_count = 0
+        self.max_waves = 3
     
     def update(self, dt: float, robots: pygame.sprite.Group) -> None:
+        # If max waves have been produced, do nothing further.
+        if self.wave_count >= self.max_waves and not self.wave_active:
+            return
+
         # Update timers
-        self.attack_timer = max(0.0, self.attack_timer - dt)
-        
-        # Handle stealth mechanics
-        if self.is_stealthed:
-            self.stealth_timer -= dt
-            if self.stealth_timer <= 0:
-                self._exit_stealth()
-        else:
-            self.stealth_cooldown_timer = max(0.0, self.stealth_cooldown_timer - dt)
-            # Auto-activate stealth when cooldown is ready and enemies are nearby
-            if self.stealth_cooldown_timer <= 0:
-                nearby_robots = self._get_nearby_robots(robots)
-                if nearby_robots:
-                    self._enter_stealth()
-        
-        # Attack nearby robots
-        if self.attack_timer <= 0:
-            target = self._find_closest_target(robots)
-            if target:
-                self._attack_robot(target)
-                self.attack_timer = self.attack_cooldown
-    
-    def _enter_stealth(self) -> None:
-        """Activate stealth mode."""
-        self.is_stealthed = True
-        self.stealth_timer = self.stealth_duration
-        # Create semi-transparent image
-        self.image = self.original_image.copy()
-        self.image.set_alpha(self.stealth_alpha)
-        print(f"🌙 Night Stalker entered stealth mode!")
-    
-    def _exit_stealth(self) -> None:
-        """Deactivate stealth mode."""
-        self.is_stealthed = False
-        self.stealth_cooldown_timer = self.stealth_cooldown
-        # Restore full opacity
-        self.image = self.original_image.copy()
-        self.image.set_alpha(255)
-        print(f"👁️ Night Stalker stealth ended")
-    
-    def _get_nearby_robots(self, robots: pygame.sprite.Group) -> list:
-        """Get robots within detection range."""
-        nearby = []
-        cx, cy = self.rect.center
-        detection_range = self.attack_range * 2  # Larger detection range
-        
-        for robot in robots:
-            if isinstance(robot, Robot):
-                dx = robot.rect.centerx - cx
-                dy = robot.rect.centery - cy
-                distance = (dx * dx + dy * dy) ** 0.5
-                if distance <= detection_range:
-                    nearby.append(robot)
-        return nearby
-    
-    def _find_closest_target(self, robots: pygame.sprite.Group) -> Robot | None:
-        """Find the closest robot within attack range."""
-        closest = None
-        closest_distance = float('inf')
-        cx, cy = self.rect.center
-        
-        for robot in robots:
-            if isinstance(robot, Robot):
-                # Only attack robots in the same lane or adjacent lanes
-                if (self.lane_row is not None and 
-                    hasattr(robot, 'lane_row') and 
-                    robot.lane_row is not None):
-                    lane_diff = abs(robot.lane_row - self.lane_row)
-                    if lane_diff > 1:  # Skip robots more than 1 lane away
-                        continue
-                
-                dx = robot.rect.centerx - cx
-                dy = robot.rect.centery - cy
-                distance = (dx * dx + dy * dy) ** 0.5
-                
-                if distance <= self.attack_range and distance < closest_distance:
-                    closest = robot
-                    closest_distance = distance
-        
-        return closest
-    
-    def _attack_robot(self, robot: Robot) -> None:
-        """Attack a robot with stealth bonus damage."""
-        base_damage_value = self.base_damage
-        
-        # Double damage when stealthed
-        if self.is_stealthed:
-            damage_amount = base_damage_value * 2
-            print(f"🗡️ Night Stalker stealth attack! {damage_amount} damage")
-            # Exit stealth after attacking
-            self._exit_stealth()
-        else:
-            damage_amount = base_damage_value
-        
-        robot.damage(damage_amount)
+        self.wave_timer = max(0.0, self.wave_timer - dt)
+
+        if self.wave_timer <= 0.0 and not self.wave_active and self.wave_count < self.max_waves:
+            self.wave_active = True
+            self.wave_radius = 0.0
+
+        if self.wave_active:
+            self.wave_radius += self.wave_speed * dt
+            wave_rect = pygame.Rect(
+                self.rect.centerx - self.wave_radius,
+                self.rect.centery - self.wave_radius,
+                self.wave_radius * 2,
+                self.wave_radius * 2,
+            )
+
+            for robot in list(robots):
+                if wave_rect.colliderect(robot.rect):
+                    robot.damage(9999) # Instant kill
+
+            if self.wave_radius >= self.wave_max_radius:
+                self.wave_count += 1
+                self.wave_active = False
+                if self.wave_count >= self.max_waves:
+                    self.kill() # Disappear after the final wave
+                else:
+                    self.wave_timer = self.wave_cooldown
     
     def render(self, screen: pygame.Surface) -> None:
         # Draw the unit
         super().render(screen)
         
-        # Draw stealth effect
-        if self.is_stealthed:
-            cx, cy = self.rect.center
-            # Create pulsing stealth effect
-            import math
-            pulse = int(50 + 30 * (0.5 + 0.5 * math.sin(pygame.time.get_ticks() * 0.01)))
+        # Draw the square shield
+        shield_size = TILE_SIZE * 1.2
+        shield_rect = pygame.Rect(0, 0, shield_size, shield_size)
+        shield_rect.center = self.rect.center
+        
+        # Pulsing alpha for the shield
+        import math
+        pulse = 100 + 50 * (0.5 + 0.5 * math.sin(pygame.time.get_ticks() * 0.004))
+        shield_color = (100, 200, 255, pulse)
+        pygame.draw.rect(screen, shield_color, shield_rect, 4, border_radius=8)
+
+        # Draw the expanding electric wave
+        if self.wave_active:
+            wave_rect = pygame.Rect(0, 0, self.wave_radius * 2, self.wave_radius * 2)
+            wave_rect.center = self.rect.center
             
-            # Draw stealth aura
-            stealth_surface = pygame.Surface((80, 80), pygame.SRCALPHA)
-            pygame.draw.circle(stealth_surface, (100, 100, 200, pulse), (40, 40), 35, width=2)
-            pygame.draw.circle(stealth_surface, (150, 150, 255, pulse // 2), (40, 40), 30, width=1)
-            
-            stealth_rect = stealth_surface.get_rect(center=(cx, cy))
-            screen.blit(stealth_surface, stealth_rect)
+            # Fade out the wave as it expands
+            wave_alpha = 255 * (1 - (self.wave_radius / self.wave_max_radius))
+            wave_color = (200, 255, 255, wave_alpha)
+            pygame.draw.rect(screen, wave_color, wave_rect, 5, border_radius=12)
 
 
 class ShadowHealer(Entity):
@@ -941,3 +966,309 @@ class ShadowHealer(Entity):
             cloak_rect = cloak_surface.get_rect(center=(cx, cy))
             screen.blit(cloak_surface, cloak_rect)
 
+
+class IceShroom(Entity):
+    """Instant-use unit that freezes all robots on the screen upon placement."""
+
+    def __init__(self, pos: tuple[int, int]) -> None:
+        super().__init__()
+        self.image = draw_ice_shroom()
+        self.rect = self.image.get_rect(center=pos)
+        self.alive_hp = 1  # It's an instant-use unit
+        self.effect_triggered = False
+
+    def update(self, dt: float, projectiles: pygame.sprite.Group, robots: pygame.sprite.Group | None = None) -> None:
+        if not self.effect_triggered and robots is not None:
+            print("❄️🍄 Ice Shroom deployed! Freezing all robots!")
+            for robot in robots:
+                if isinstance(robot, Robot):
+                    # Apply a strong slow effect for a long duration
+                    robot.apply_slow(0.0, 6.0)  # 0.0 factor means a complete freeze for 6 seconds
+            
+            self.effect_triggered = True
+            # Remove itself after the effect is triggered
+            self.kill()
+
+
+class DoomShroom(Entity):
+    """Instant-use unit that creates a massive explosion and leaves a crater."""
+
+    def __init__(self, pos: tuple[int, int], crater_group: pygame.sprite.Group, effects_group: pygame.sprite.Group) -> None:
+        super().__init__()
+        self.image = draw_doom_shroom()
+        self.rect = self.image.get_rect(center=pos)
+        self.alive_hp = 1
+        self.timer = DOOM_SHROOM_ARM_TIME
+        self.crater_group = crater_group
+        self.effects_group = effects_group
+
+    def update(self, dt: float, projectiles: pygame.sprite.Group, robots: pygame.sprite.Group | None = None) -> None:
+        self.timer -= dt
+        if self.timer <= 0.0:
+            print("💥🍄 DOOM! Massive explosion!")
+            center = self.rect.center
+
+            # Post a screen shake event
+            from game.scenes import SCREEN_SHAKE_EVENT
+            shake_event = pygame.event.Event(SCREEN_SHAKE_EVENT, magnitude=15, duration=0.4)
+            pygame.event.post(shake_event)
+            # Create the visual explosion effect
+            self.effects_group.add(ExplosionEffect(center, DOOM_SHROOM_RADIUS))
+
+            if robots:
+                for r in list(robots):
+                    if isinstance(r, Robot):
+                        distance = pygame.math.Vector2(r.rect.center).distance_to(center)
+                        if distance <= DOOM_SHROOM_RADIUS:
+                            r.damage(9999) # Instant kill
+            
+            # Leave a crater
+            crater = Crater(center)
+            self.crater_group.add(crater)
+            
+            self.kill()
+
+
+class Crater(Entity):
+    """A temporary crater that blocks planting."""
+
+    def __init__(self, pos: tuple[int, int]) -> None:
+        super().__init__()
+        self.image = draw_crater()
+        self.rect = self.image.get_rect(center=pos)
+        self.alive_hp = 1
+        self.lifetime = CRATER_LIFETIME
+
+    def update(self, dt: float) -> None:
+        self.lifetime -= dt
+        if self.lifetime <= 0:
+            self.kill()
+
+
+class ExplosionEffect(Entity):
+    """A visual effect for a large explosion, like from DoomShroom."""
+
+    def __init__(self, pos: tuple[int, int], radius: float, duration: float = 0.5) -> None:
+        super().__init__()
+        self.center = pos
+        self.max_radius = radius
+        self.duration = duration
+        self.lifetime = duration
+
+    def update(self, dt: float) -> None:
+        self.lifetime -= dt
+        if self.lifetime <= 0:
+            self.kill()
+
+    def render(self, screen: pygame.Surface) -> None:
+        if self.lifetime <= 0:
+            return
+
+        progress = 1.0 - (self.lifetime / self.duration)  # 0 to 1
+        current_radius = self.max_radius * progress
+        alpha = int(255 * (1.0 - progress**2))  # Fade out quickly
+
+        # Draw multiple expanding circles for a shockwave effect
+        pygame.draw.circle(screen, (255, 200, 100, alpha), self.center, int(current_radius), width=int(current_radius * 0.2))
+        pygame.draw.circle(screen, (255, 100, 50, alpha * 0.7), self.center, int(current_radius * 0.7), width=int(current_radius * 0.15))
+        pygame.draw.circle(screen, (255, 255, 255, alpha * 0.5), self.center, int(current_radius * 0.4))
+
+
+class SunShroom(Entity):
+    """Grows over time to produce more energy."""
+
+    def __init__(self, pos: tuple[int, int]) -> None:
+        super().__init__()
+        self.stage = 0  # 0 for small, 1 for large
+        self.image = draw_sun_shroom(self.stage)
+        self.rect = self.image.get_rect(center=pos)
+        self.alive_hp = GENERATOR_HP
+        self.growth_timer = SUN_SHROOM_GROW_TIME
+        self.spawn_timer = SUN_SHROOM_INITIAL_COOLDOWN
+
+    def update(self, dt: float, energy_group: pygame.sprite.Group) -> None:
+        # Handle growth
+        if self.stage == 0 and self.growth_timer > 0:
+            self.growth_timer -= dt
+            if self.growth_timer <= 0:
+                self.stage = 1
+                center = self.rect.center
+                self.image = draw_sun_shroom(self.stage)
+                self.rect = self.image.get_rect(center=center)
+                print("🍄 Sun-shroom grew to full size!")
+
+        # Handle energy production
+        self.spawn_timer -= dt
+        if self.spawn_timer <= 0.0:
+            if self.stage == 0:
+                self.spawn_timer = SUN_SHROOM_INITIAL_COOLDOWN
+                drop = EnergyDrop((self.rect.centerx, self.rect.y - 10), value=SUN_SHROOM_SMALL_ENERGY)
+            else: # stage 1
+                self.spawn_timer = SUN_SHROOM_NORMAL_COOLDOWN
+                drop = EnergyDrop((self.rect.centerx, self.rect.y - 10), value=ENERGY_DROP_VALUE)
+            
+            energy_group.add(drop)
+
+
+class PuffShroom(Human):
+    """A free, short-range, temporary attacker."""
+
+    def __init__(self, pos: tuple[int, int], lane_row: int | None = None) -> None:
+        super().__init__(pos, lane_row)
+        self.image = draw_puff_shroom()
+        self.rect = self.image.get_rect(center=pos)
+        self.alive_hp = PUFF_SHROOM_HP
+        self.lifetime = PUFF_SHROOM_LIFETIME
+        self.attack_range = PUFF_SHROOM_RANGE
+
+    def update(self, dt: float, projectiles: pygame.sprite.Group, robots: pygame.sprite.Group | None = None) -> None:
+        # Countdown lifetime
+        self.lifetime -= dt
+        if self.lifetime <= 0:
+            self.kill()
+            return
+        
+        # Use base Human update for shooting
+        super().update(dt, projectiles, robots)
+
+    def try_shoot(self, projectiles: pygame.sprite.Group, robots: pygame.sprite.Group | None) -> None:
+        # Override to use a custom attack range
+        if self.shoot_timer <= 0.0 and robots:
+            for r in robots:
+                if self.lane_row is not None and getattr(r, "lane_row", None) == self.lane_row and 0 < (r.rect.centerx - self.rect.centerx) < self.attack_range:
+                    proj = Projectile((self.rect.right - 8, self.rect.centery))
+                    projectiles.add(proj)
+                    self.shoot_timer = self.shoot_cooldown
+                    break
+
+
+class ScaredyShroom(Human):
+    """A cheap, long-range shooter that hides when robots get close."""
+
+    def __init__(self, pos: tuple[int, int], lane_row: int | None = None) -> None:
+        super().__init__(pos, lane_row)
+        self.is_scared = False
+        self.original_image = draw_scaredy_shroom(scared=False)
+        self.scared_image = draw_scaredy_shroom(scared=True)
+        self.image = self.original_image
+        self.rect = self.image.get_rect(center=pos)
+        self.alive_hp = SCAREDY_SHROOM_HP
+        self.scared_range = SCAREDY_SHROOM_SCARED_RANGE
+
+    def update(self, dt: float, projectiles: pygame.sprite.Group, robots: pygame.sprite.Group | None = None) -> None:
+        self.shoot_timer = max(0.0, self.shoot_timer - dt)
+        
+        # Check if scared
+        self.is_scared = False
+        if robots:
+            for r in robots:
+                distance = abs(r.rect.centerx - self.rect.centerx)
+                if distance < self.scared_range:
+                    self.is_scared = True
+                    break
+        
+        # Update visual state based on fear
+        self.image = self.scared_image if self.is_scared else self.original_image
+
+        # Only try to shoot if not scared
+        if not self.is_scared:
+            self.try_shoot(projectiles, robots)
+
+
+class Leaf(Entity):
+    """A simple leaf that can be placed on water, acting as a weak blocker."""
+
+    def __init__(self, pos: tuple[int, int]) -> None:
+        super().__init__()
+        self.image = draw_leaf()
+        self.rect = self.image.get_rect(center=pos)
+        self.alive_hp = GENERATOR_HP # Same HP as a generator
+
+
+class SeaMine(Entity):
+    """Aquatic mine that explodes when robots get close"""
+
+    def __init__(self, pos: tuple[int, int]) -> None:
+        super().__init__()
+        self.image = draw_sea_mine()
+        self.rect = self.image.get_rect(center=pos)
+        self.timer = 1.5 # arming time
+        self.effect_triggered = False
+
+    def update(self, dt: float, robots: pygame.sprite.Group) -> None:
+        self.timer -= dt
+        if self.timer <= 0.0 and not self.effect_triggered:
+            # Find a robot in proximity and detonate the mine
+            for robot in robots:
+                if self.rect.colliderect(robot.rect):
+                    # Explosion!
+                    from game.scenes import SCREEN_SHAKE_EVENT
+                    shake_event = pygame.event.Event(SCREEN_SHAKE_EVENT, magnitude=10, duration=0.3)
+                    pygame.event.post(shake_event)
+
+                    robot.damage(BOMB_DAMAGE)
+                    self.kill() # Sea Mine disappears after use
+                    self.effect_triggered = True # Ensure it only runs once
+                    print(f"💥 Sea Mine exploded!")
+                    break
+
+
+
+class TangleKelp(Entity):
+    """An instant-use plant that drags the first robot on its tile underwater."""
+
+    def __init__(self, pos: tuple[int, int]) -> None:
+        super().__init__()
+        self.image = draw_tangle_kelp()
+        self.rect = self.image.get_rect(center=pos)
+        self.alive_hp = 1 # Instant use
+        self.effect_triggered = False
+
+    def update(self, dt: float, robots: pygame.sprite.Group) -> None:
+        if not self.effect_triggered:
+            # Find a robot on the same tile and kill it
+            for robot in robots:
+                if self.rect.colliderect(robot.rect):
+                    robot.damage(9999) # Instant kill
+                    self.kill() # Tangle Kelp disappears after use
+                    break
+            self.effect_triggered = True # Ensure it only runs once
+
+
+class SeaShroom(PuffShroom):
+    """An aquatic, temporary attacker, similar to PuffShroom."""
+
+    def __init__(self, pos: tuple[int, int], lane_row: int | None = None) -> None:
+        super().__init__(pos, lane_row)
+        self.image = draw_sea_shroom()
+
+
+class Cattail(Human):
+    """An upgrade for Lily Pad that shoots homing spikes at the nearest robot."""
+
+    def __init__(self, pos: tuple[int, int]) -> None:
+        # Cattail doesn't have a lane, it can target any lane
+        super().__init__(pos, lane_row=None)
+        self.image = draw_cattail()
+        self.rect = self.image.get_rect(center=pos)
+        self.alive_hp = SHOOTER_HP * 2 # Tougher than a normal shooter
+        self.shoot_cooldown = 1.0 # Fires reasonably fast
+
+    def try_shoot(self, projectiles: pygame.sprite.Group, robots: pygame.sprite.Group | None) -> None:
+        if self.shoot_timer <= 0.0 and robots and len(robots) > 0:
+            # Find the nearest robot on the entire screen
+            my_pos = pygame.math.Vector2(self.rect.center)
+            
+            closest_robot = None
+            min_dist_sq = float('inf')
+
+            for robot in robots:
+                dist_sq = my_pos.distance_to_squared(robot.rect.center)
+                if dist_sq < min_dist_sq:
+                    min_dist_sq = dist_sq
+                    closest_robot = robot
+            
+            if closest_robot:
+                proj = SpikeProjectile(self.rect.center, closest_robot)
+                projectiles.add(proj)
+                self.shoot_timer = self.shoot_cooldown

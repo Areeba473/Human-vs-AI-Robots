@@ -12,15 +12,15 @@ TILES_PER_LANE = 9
 TILE_SIZE = 80
 
 # Themes and progression
-THEMES = ["Day", "Night", "Fog", "Water", "Roof"]
+THEMES = ["Day", "Night", "Pool", "Fog", "Roof"]
 LEVELS_PER_THEME = 10
 
 # Colors
 COLOR_BG = {
     "Day": (120, 180, 120),
     "Night": (40, 60, 100),
+    "Pool": (70, 130, 180),
     "Fog": (100, 120, 120),
-    "Water": (70, 130, 180),
     "Roof": (160, 120, 80),
 }
 
@@ -42,6 +42,20 @@ UNIT_DEFS = [
     {"key": "virus", "name": "Virus", "cost": 150, "cooldown": 12.0},  # Contact-kill hazard with spread effect
     {"key": "bubble_shooter", "name": "Bubble Shooter", "cost": 0, "cooldown": 3.0},  # Free bubble shooter for Night theme
     {"key": "shield_defender", "name": "Shield Defender", "cost": 100, "cooldown": 8.0},  # Energy shield defender for Night theme
+    {"key": "night_stalker", "name": "Night Stalker", "cost": 175, "cooldown": 15.0}, # Stealth assassin
+    {"key": "shadow_healer", "name": "Shadow Healer", "cost": 125, "cooldown": 20.0}, # Stealth healer
+    {"key": "ice_shroom", "name": "Ice Shroom", "cost": 75, "cooldown": 30.0}, # Instant-use, freezes all robots
+    {"key": "gatling_pea", "name": "Gatling Pea", "cost": 250, "cooldown": 20.0}, # Rapid-fire attacker
+    {"key": "doom_shroom", "name": "Doom Shroom", "cost": 300, "cooldown": 50.0}, # Massive explosion, leaves a crater
+    {"key": "sun_shroom", "name": "Sun Shroom", "cost": 25, "cooldown": 7.5}, # Grows to produce more energy
+    {"key": "puff_shroom", "name": "Puff Shroom", "cost": 0, "cooldown": 5.0}, # Free, short-range, temporary attacker
+    {"key": "scaredy_shroom", "name": "Scaredy Shroom", "cost": 25, "cooldown": 7.5}, # Cheap, long-range, but cowardly
+    {"key": "leaf", "name": "Lily Pad", "cost": 25, "cooldown": 5.0}, # A floating lily pad platform
+    {"key": "tangle_kelp", "name": "Tangle Kelp", "cost": 25, "cooldown": 20.0}, # Drags a robot underwater
+    {"key": "sea_shroom", "name": "Sea-shroom", "cost": 0, "cooldown": 5.0}, # Aquatic, temporary attacker
+    {"key": "cattail", "name": "Cattail", "cost": 225, "cooldown": 30.0}, # Upgrade for Lily Pad, shoots spikes in any lane
+    {"key": "spikerock", "name": "Spikerock", "cost": 125, "cooldown": 20.0}, # Upgrade for Wall, damages robots
+    {"key": "sea_mine", "name": "Sea Mine", "cost": 75, "cooldown": 30.0}, # Single-use, explodes on contact
 ]
 
 # Combat
@@ -54,11 +68,18 @@ SHOOTER_COOLDOWN = 1.2
 # With two robots chewing (24 dps), 120 HP gives ~5 seconds of blocking time.
 WALL_HP = 300
 WALL_CONTACT_DAMAGE_PER_SEC = 24.0  # Thorns damage to robots while they chew the wall
+SPIKEROCK_HP = WALL_HP * 2
+SPIKEROCK_CONTACT_DAMAGE_PER_SEC = WALL_CONTACT_DAMAGE_PER_SEC * 2
 SHOOTER_HP = 6
 GENERATOR_HP = 6
 BOMB_ARM_TIME = 1.0
 BOMB_RADIUS = TILE_SIZE * 1.5  # Increased radius for better cross-lane coverage
 BOMB_DAMAGE = 100  # Increased damage for cross-lane explosions
+
+# Doom Shroom
+DOOM_SHROOM_ARM_TIME = 1.5
+DOOM_SHROOM_RADIUS = TILE_SIZE * 2.5
+CRATER_LIFETIME = 25.0 # Crater blocks planting for 25 seconds
 
 # Mowers
 MOWER_SPEED = 420.0
@@ -80,7 +101,7 @@ VIRUS_LIFETIME = 12.0
 
 # Night Stalker
 NIGHT_STALKER_HP = 8
-NIGHT_STALKER_DAMAGE = 3
+NIGHT_STALKER_DAMAGE = 5
 NIGHT_STALKER_STEALTH_DURATION = 5.0
 NIGHT_STALKER_STEALTH_COOLDOWN = 8.0
 
@@ -90,6 +111,22 @@ SHADOW_HEALER_HEAL_AMOUNT = 3
 SHADOW_HEALER_HEAL_RADIUS = TILE_SIZE * 1.3
 SHADOW_HEALER_HEAL_COOLDOWN = 3.0
 SHADOW_HEALER_CLOAK_DURATION = 4.0
+
+# Sun Shroom
+SUN_SHROOM_GROW_TIME = 30.0 # Time to grow to full size
+SUN_SHROOM_SMALL_ENERGY = 15
+SUN_SHROOM_INITIAL_COOLDOWN = 20.0
+SUN_SHROOM_NORMAL_COOLDOWN = 17.0
+
+# Puff Shroom
+PUFF_SHROOM_LIFETIME = 20.0 # Lasts for 20 seconds
+PUFF_SHROOM_RANGE = TILE_SIZE * 1.5 # Short attack range
+PUFF_SHROOM_HP = 5
+
+# Scaredy Shroom
+SCAREDY_SHROOM_SCARED_RANGE = TILE_SIZE * 2.0 # Hides if robot is within 2 tiles
+SCAREDY_SHROOM_HP = 5
+
 
 # Level Configuration
 # Progression: Level 1=Wall, Level 2=Generator, Level 3=Frozen, Level 4=Frozen, Level 5=Bomb, Level 6=Healer

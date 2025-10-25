@@ -102,6 +102,11 @@ def _load_unit_sprite(key: str, size: tuple[int, int]) -> pygame.Surface | None:
             os.path.join("images", "units", "Robot current charger.png"),
             os.path.join("images", "Robot current charger.png"),
         ])
+    if key == "cattail":
+        candidates.extend([
+            os.path.join("images", "units", "cattil.png"),
+            os.path.join("images", "cattil.png"),
+        ])
     
     print(f"🔍 Looking for {key} sprite in candidates: {candidates}")
     
@@ -493,4 +498,221 @@ def draw_shadow_healer() -> pygame.Surface:
     pygame.draw.rect(surf, (100, 255, 150), pygame.Rect(20, 31, 16, 6), border_radius=2)
     # shadow aura
     pygame.draw.circle(surf, (150, 100, 200, 100), (28, 28), 25, width=2)
+    return surf
+
+
+def draw_ice_shroom() -> pygame.Surface:
+    """Load ice shroom sprite if present, else draw a simple ice shroom."""
+    sprite = _load_unit_sprite("ice_shroom", (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    # Fallback simple ice shroom icon
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    # Stem
+    pygame.draw.rect(surf, (200, 220, 255), pygame.Rect(22, 30, 12, 18), border_radius=4)
+    # Cap
+    pygame.draw.ellipse(surf, (120, 180, 255), pygame.Rect(10, 10, 36, 28))
+    # Ice spots
+    pygame.draw.circle(surf, (220, 240, 255), (20, 20), 5)
+    pygame.draw.circle(surf, (220, 240, 255), (36, 22), 4)
+    return surf
+
+
+def draw_gatling_pea() -> pygame.Surface:
+    """Load gatling pea sprite if present, else draw a simple one."""
+    sprite = _load_unit_sprite("gatling_pea", (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    # Fallback simple gatling pea icon
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    # Body
+    pygame.draw.rect(surf, (40, 100, 40), pygame.Rect(8, 18, 40, 30), border_radius=8)
+    # Head
+    pygame.draw.circle(surf, (60, 140, 60), (28, 14), 12)
+    # Barrels
+    pygame.draw.rect(surf, (20, 60, 20), pygame.Rect(44, 22, 10, 6), border_radius=2)
+    pygame.draw.rect(surf, (20, 60, 20), pygame.Rect(44, 32, 10, 6), border_radius=2)
+    return surf
+
+
+def draw_doom_shroom() -> pygame.Surface:
+    """Load doom shroom sprite if present, else draw a simple one."""
+    sprite = _load_unit_sprite("doom_shroom", (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    # Fallback simple doom shroom icon
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    # Stem
+    pygame.draw.rect(surf, (80, 70, 70), pygame.Rect(22, 30, 12, 18), border_radius=4)
+    # Cap
+    pygame.draw.ellipse(surf, (60, 50, 50), pygame.Rect(8, 8, 40, 32))
+    # Angry eyes
+    pygame.draw.circle(surf, (255, 100, 100), (20, 20), 4)
+    pygame.draw.circle(surf, (255, 100, 100), (36, 20), 4)
+    return surf
+
+
+def draw_crater() -> pygame.Surface:
+    """Draws a crater that blocks planting."""
+    surf = pygame.Surface((80, 80), pygame.SRCALPHA)
+    # Main crater hole
+    pygame.draw.circle(surf, (80, 60, 40), (40, 40), 35)
+    # Darker inner part
+    pygame.draw.circle(surf, (50, 40, 30), (40, 40), 25)
+    # Cracks
+    pygame.draw.line(surf, (90, 70, 50), (40, 5), (42, 18), 2)
+    pygame.draw.line(surf, (90, 70, 50), (75, 40), (60, 42), 2)
+    return surf
+
+
+def draw_sun_shroom(stage: int = 0) -> pygame.Surface:
+    """Load sun shroom sprite if present, else draw a simple one based on growth stage."""
+    key = f"sun_shroom_{stage}"
+    sprite = _load_unit_sprite(key, (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    if stage == 0: # Small
+        # Stem
+        pygame.draw.rect(surf, (230, 200, 150), pygame.Rect(24, 32, 8, 12), border_radius=3)
+        # Cap
+        pygame.draw.ellipse(surf, (255, 210, 100), pygame.Rect(18, 20, 20, 18))
+    else: # Large
+        # Stem
+        pygame.draw.rect(surf, (230, 200, 150), pygame.Rect(22, 28, 12, 20), border_radius=4)
+        # Cap
+        pygame.draw.ellipse(surf, (255, 210, 100), pygame.Rect(10, 10, 36, 28))
+
+    return surf
+
+
+def draw_puff_shroom() -> pygame.Surface:
+    """Load puff shroom sprite if present, else draw a simple one."""
+    sprite = _load_unit_sprite("puff_shroom", (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    
+    # Fallback simple puff shroom icon
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    # Stem
+    pygame.draw.rect(surf, (180, 160, 220), pygame.Rect(24, 30, 8, 14), border_radius=3)
+    # Cap
+    pygame.draw.ellipse(surf, (140, 120, 180), pygame.Rect(18, 20, 20, 18))
+    # Puffed cheeks
+    pygame.draw.circle(surf, (160, 140, 200), (20, 32), 5)
+    pygame.draw.circle(surf, (160, 140, 200), (36, 32), 5)
+    return surf
+
+
+def draw_scaredy_shroom(scared: bool = False) -> pygame.Surface:
+    """Load scaredy shroom sprite if present, else draw a simple one."""
+    key = f"scaredy_shroom_{'scared' if scared else 'normal'}"
+    sprite = _load_unit_sprite(key, (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    if scared:
+        # Hiding state
+        pygame.draw.rect(surf, (160, 140, 190), pygame.Rect(20, 38, 16, 10), border_radius=4) # Small stem
+        pygame.draw.ellipse(surf, (120, 100, 150), pygame.Rect(16, 30, 24, 16)) # Cap on ground
+    else:
+        # Normal shooting state
+        pygame.draw.rect(surf, (160, 140, 190), pygame.Rect(24, 28, 8, 20), border_radius=3) # Tall stem
+        pygame.draw.ellipse(surf, (120, 100, 150), pygame.Rect(18, 18, 20, 18)) # Cap on top
+        # Eyes
+        pygame.draw.circle(surf, (255, 255, 255), (24, 26), 3)
+        pygame.draw.circle(surf, (255, 255, 255), (32, 26), 3)
+    return surf
+
+
+def draw_leaf() -> pygame.Surface:
+    """Load leaf sprite if present, else draw a simple one."""
+    sprite = _load_unit_sprite("leaf", (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    
+    # Fallback simple leaf icon
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    # A simple green leaf shape (like a lily pad)
+    pygame.draw.ellipse(surf, (60, 160, 80), pygame.Rect(8, 8, 40, 40))
+    pygame.draw.line(surf, (40, 120, 60), (28, 10), (28, 46), 2) # Vein
+    return surf
+
+
+def draw_tangle_kelp() -> pygame.Surface:
+    """Load tangle kelp sprite if present, else draw a simple one."""
+    sprite = _load_unit_sprite("tangle_kelp", (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    
+    # Fallback simple tangle kelp icon
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    pygame.draw.circle(surf, (40, 100, 60), (28, 40), 12) # Base
+    pygame.draw.line(surf, (60, 140, 80), (28, 40), (28, 10), 4) # Tentacle
+    return surf
+
+
+def draw_sea_shroom() -> pygame.Surface:
+    """Load sea shroom sprite if present, else draw a simple one."""
+    sprite = _load_unit_sprite("sea_shroom", (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    
+    # Fallback simple sea shroom icon (blueish puff-shroom)
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    pygame.draw.rect(surf, (140, 180, 220), pygame.Rect(24, 30, 8, 14), border_radius=3) # Stem
+    pygame.draw.ellipse(surf, (100, 140, 180), pygame.Rect(18, 20, 20, 18)) # Cap
+    return surf
+
+
+def draw_cattail() -> pygame.Surface:
+    """Load cattail sprite if present, else draw a simple one."""
+    sprite = _load_unit_sprite("cattail", (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    
+    # Fallback simple cattail icon
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    # Body
+    pygame.draw.ellipse(surf, (139, 69, 19), pygame.Rect(14, 20, 28, 28))
+    # Tail
+    pygame.draw.line(surf, (160, 82, 45), (40, 34), (50, 24), 6)
+    # Ears
+    pygame.draw.polygon(surf, (139, 69, 19), [(18, 22), (14, 14), (22, 18)])
+    pygame.draw.polygon(surf, (139, 69, 19), [(34, 22), (38, 14), (30, 18)])
+    return surf
+
+
+def draw_spike_projectile() -> pygame.Surface:
+    """Draws a simple spike projectile."""
+    surf = pygame.Surface((12, 12), pygame.SRCALPHA)
+    pygame.draw.polygon(surf, (180, 180, 180), [(0, 6), (12, 0), (12, 12)])
+    return surf
+
+
+def draw_spikerock() -> pygame.Surface:
+    """Load spikerock sprite if present, else draw a simple one."""
+    sprite = _load_unit_sprite("spikerock", (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+    
+    # Fallback simple spikerock icon (a wall with spikes)
+    surf = draw_wall_block()
+    pygame.draw.polygon(surf, (100, 100, 110), [(8, 12), (14, 4), (20, 12)])
+    pygame.draw.polygon(surf, (100, 100, 110), [(36, 12), (42, 4), (48, 12)])
+    return surf
+
+def draw_sea_mine() -> pygame.Surface:
+    """Load sea mine sprite if present, else draw a simple one."""
+    sprite = _load_unit_sprite("sea_mine", (56, 56))
+    if sprite is not None:
+        return sprite.copy()
+
+    # Fallback simple sea mine icon (a spiky ball)
+    surf = pygame.Surface((56, 56), pygame.SRCALPHA)
+    pygame.draw.circle(surf, (60, 60, 60), (28, 28), 18) # Body
+    pygame.draw.line(surf, (80, 80, 80), (10, 10), (16, 16), 2) # Spikes
+    pygame.draw.line(surf, (80, 80, 80), (46, 10), (40, 16), 2)
     return surf

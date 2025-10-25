@@ -18,7 +18,20 @@ from game.assets import (
     draw_virus,
     draw_bubble_shooter,
     draw_shield_defender,
+    draw_shadow_healer,
+    draw_ice_shroom,
     draw_shovel,
+    draw_gatling_pea,
+    draw_doom_shroom,
+    draw_sun_shroom,
+    draw_puff_shroom,
+    draw_scaredy_shroom,
+    draw_leaf,
+    draw_tangle_kelp,
+    draw_sea_shroom,
+    draw_cattail,
+    draw_sea_mine,
+    draw_spikerock,
 )
 
 
@@ -31,6 +44,7 @@ class HUD:
         self.orientation = orientation  # "top" or "left"
         self.unit_defs: List[dict] = unit_defs if unit_defs is not None else UNIT_DEFS
         # cooldown trackers per slot
+        self.hud_rect = pygame.Rect(0, 0, 0, 0) # Main rect for the HUD area
         self.cooldowns: List[float] = [0.0 for _ in self.unit_defs]
         self.shovel_mode = False
         self.enable_shovel = enable_shovel
@@ -77,6 +91,32 @@ class HUD:
             base = draw_bubble_shooter()
         elif key == "shield_defender":
             base = draw_shield_defender()
+        elif key == "shadow_healer":
+            base = draw_shadow_healer()
+        elif key == "ice_shroom":
+            base = draw_ice_shroom()
+        elif key == "gatling_pea":
+            base = draw_gatling_pea()
+        elif key == "doom_shroom":
+            base = draw_doom_shroom()
+        elif key == "sun_shroom":
+            base = draw_sun_shroom()
+        elif key == "puff_shroom":
+            base = draw_puff_shroom()
+        elif key == "scaredy_shroom":
+            base = draw_scaredy_shroom()
+        elif key == "leaf":
+            base = draw_leaf()
+        elif key == "tangle_kelp":
+            base = draw_tangle_kelp()
+        elif key == "sea_shroom":
+            base = draw_sea_shroom()
+        elif key == "cattail":
+            base = draw_cattail()
+        elif key == "spikerock":
+            base = draw_spikerock()
+        elif key == "sea_mine":
+            base = draw_sea_mine()
         elif key == "shovel":
             base = draw_shovel()
         else:
@@ -143,12 +183,25 @@ class HUD:
                     frac = (new_bar_y - track.y) / max(1, (track.h - bar_h))
                     self.scroll = frac * max_scroll
 
+    def is_pos_on_hud(self, pos: tuple[int, int]) -> bool:
+        """Check if a given position is on the HUD area."""
+        if self.hud_rect.collidepoint(pos):
+            return True
+        # Also check individual slot rects in case they are outside the main HUD rect (scrolling)
+        return any(r.collidepoint(pos) for r in self._slot_rects)
+
     def draw(self, screen: pygame.Surface, energy: int) -> None:
         if self.orientation == "left":
             # left vertical bar (full height)
             pygame.draw.rect(screen, (35, 35, 35), (0, 0, 120, screen.get_height()))
         else:
             pygame.draw.rect(screen, (30, 30, 30), (0, 0, self.width, self.height))
+
+        # Update the main HUD rect for click detection
+        if self.orientation == "left":
+            self.hud_rect = pygame.Rect(0, 0, 120, screen.get_height())
+        else:
+            self.hud_rect = pygame.Rect(0, 0, self.width, self.height)
 
         # rebuild slot rects each draw to reflect scroll
         self._slot_rects = []
